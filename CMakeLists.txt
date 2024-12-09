@@ -33,3 +33,13 @@ target_link_libraries(io_test_cache PRIVATE block_cache)
 target_include_directories(io_test_cache PRIVATE
     ${CMAKE_SOURCE_DIR}/source/monolith
 )
+
+# Модифицированная версия тестера с кэшем
+add_executable(test_prefetching
+    source/monolith/test-prefetching.cpp
+)
+
+target_link_libraries(test_prefetching PRIVATE block_cache)
+target_include_directories(test_prefetching PRIVATE
+    ${CMAKE_SOURCE_DIR}/source/monolith
+)

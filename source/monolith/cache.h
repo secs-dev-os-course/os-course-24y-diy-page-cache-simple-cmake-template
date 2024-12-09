@@ -62,6 +62,7 @@ public:
     off_t seek(off_t offset, int whence);
     
 private:
+    void prefetch_blocks(size_t start_block, size_t block_count);
     void evict_block();
     std::list<CacheBlock>::iterator get_block(size_t block_number);
     ssize_t read_internal(void* buf, size_t count, off_t offset);
