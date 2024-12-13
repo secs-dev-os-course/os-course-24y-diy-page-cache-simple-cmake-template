@@ -8,12 +8,12 @@
 #include <random>
 #include <string>
 #include <thread>
-#include "cache_api.h"  // Добавляем наш API
+#include "cache_api.h" 
 
 namespace {
 
 constexpr int KBlockSize = 16 * 1024;         // 16K
-constexpr int KFileSize = 5 * 1024 * 1024;   // 5MB
+constexpr int KFileSize = 4 * 1024 * 1024;   // 5MB
 constexpr double KMegabyte = 1024.0 * 1024.0;
 
 [[nodiscard]] auto GenerateUniqueFilename() -> std::string {

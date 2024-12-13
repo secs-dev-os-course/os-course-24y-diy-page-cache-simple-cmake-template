@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <iostream>
 
-// #define ENABLE_PREFETCH // Уберите комментарий, чтобы включить предзагрузку
+#define ENABLE_PREFETCH 
 Cache::Cache(const char* path) {
     file_handle = CreateFileA(
         path,
@@ -116,10 +116,11 @@ ssize_t Cache::read_internal(void* buf, size_t count, off_t offset) {
 
     
         auto cache_block = get_block(block_number);
+        #ifdef ENABLE_PREFETCH
         std::cout << "[Read] Block " << block_number 
                   << (block_in_cache ? " found in cache" : " loaded from disk") 
                   << std::endl;
-
+        #endif
         size_t remaining = count - total_read;
         size_t can_read = std::min(remaining, BLOCK_SIZE - block_offset);
         can_read = std::min(can_read, static_cast<size_t>(file_size - (offset + total_read)));

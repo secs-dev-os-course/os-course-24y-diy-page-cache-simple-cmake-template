@@ -12,7 +12,7 @@ void generate_test_file(const char* file_path, size_t file_size) {
         return;
     }
 
-    std::vector<char> block(4096, 'A'); // Блок заполнен символом 'A'
+    std::vector<char> block(4096, 'A');
     size_t blocks_to_write = file_size / block.size();
 
     for (size_t i = 0; i < blocks_to_write; ++i) {
@@ -39,16 +39,16 @@ void test_prefetching(const char* file_path) {
     }
 
     const size_t block_size = 4096;
-    const size_t read_blocks = 10; // Сколько блоков прочитать
+    const size_t read_blocks = 10;
     char buffer[block_size * read_blocks];
 
     std::cout << "Reading blocks sequentially..." << std::endl;
     for (size_t i = 0; i < read_blocks; ++i) {
-        auto start_time = std::chrono::high_resolution_clock::now(); // Начало измерения
+        auto start_time = std::chrono::high_resolution_clock::now(); 
 
         ssize_t bytes_read = lab2_read(fd, buffer + i * block_size, block_size);
 
-        auto end_time = std::chrono::high_resolution_clock::now(); // Конец измерения
+        auto end_time = std::chrono::high_resolution_clock::now(); 
         std::chrono::duration<double> elapsed_time = end_time - start_time;
 
         if (bytes_read <= 0) {
@@ -56,7 +56,7 @@ void test_prefetching(const char* file_path) {
             break;
         }
 
-        double speed = bytes_read / elapsed_time.count() / 1024.0; // Скорость в КБ/с
+        double speed = bytes_read / elapsed_time.count() / 1024.0;
         std::cout << "Read block " << i 
                   << ", bytes: " << bytes_read 
                   << ", speed: " << speed << " KB/s" << std::endl;
