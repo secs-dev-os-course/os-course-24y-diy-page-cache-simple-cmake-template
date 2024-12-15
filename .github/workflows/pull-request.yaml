@@ -1,0 +1,28 @@
+on:
+  pull_request
+
+jobs:
+  pull_request_checks:
+    name: Pull-Request checks
+
+    runs-on: self-hosted-basic
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential cmake clang clang-format clang-tidy
+
+      - name: Build project
+        run: |
+          cmake --preset dev
+          cmake --build --preset dev
+
+      - name: Clang-format
+        run: cmake --build build/dev --target clang-format-check
+
+      - name: Clang-tidy
+        run: cmake --build build/dev --target clang-tidy-check

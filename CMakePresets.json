@@ -1,0 +1,49 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Developer",
+      "description": "Developer configuration",
+      "binaryDir": "build/dev",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "OS_LAB2_DEVELOPER": "True"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "description": "Debug configuration",
+      "binaryDir": "build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "OS_LAB2_DEVELOPER": "False"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "description": "Release configuration",
+      "binaryDir": "build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "OS_LAB2_DEVELOPER": "False"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    }
+  ]
+}

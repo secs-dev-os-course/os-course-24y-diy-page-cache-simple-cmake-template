@@ -1,15 +1,11 @@
 cmake_minimum_required(VERSION 3.12)
 
-project(my-project
-        VERSION 0.0.0
-        DESCRIPTION "My best project"
-        LANGUAGES C CXX
-)
+project(os-lab2 VERSION 0.0.0 LANGUAGES C)
 
-set(CMAKE_C_STANDARD 23)
-set(CMAKE_C_STANDARD_REQUIRED True)
+option(OS_LAB2_DEVELOPER "Enable ${PROJECT_NAME} developer mode" False)
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+include(cmake/CompileOptions.cmake)
+include(cmake/ClangFormat.cmake)
+include(cmake/ClangTidy.cmake)
 
-add_subdirectory(app)
+add_subdirectory(source)
