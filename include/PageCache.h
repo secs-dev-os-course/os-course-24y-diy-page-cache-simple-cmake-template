@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <queue>
+#include <set>
 #include <unordered_map>
 
 #define CACHE_SIZE 256 * 1024 * 1024  // Bytes
@@ -16,16 +17,6 @@ typedef struct CacheBlock {
     std::chrono::time_point<std::chrono::steady_clock> access_time;
 } CacheBlock;
 
-class CacheBlockFreqComparator {
-   public:
-    bool operator()(CacheBlock cb1, CacheBlock cb2);
-};
-
-class CacheBlockTimeComparator {
-   public:
-    bool operator()(CacheBlock cb1, CacheBlock cb2);
-};
-
 struct PairHasher {
    public:
     template <typename T, typename U>
@@ -35,15 +26,27 @@ struct PairHasher {
 class PageCache {
     size_t max_cache_bytes_am;
 
-    std::unordered_map<std::pair<int, int>, CacheBlock, PairHasher> cache_blocks;
+    std::unordered_map<std::pair<int, int>, CacheBlock, PairHasher> cache_blocks;  // key = <fd, page num>
 
-    std::priority_queue<CacheBlock, std::vector<CacheBlock>, CacheBlockFreqComparator> freq_pq;
-    std::priority_queue<CacheBlock, std::vector<CacheBlock>, CacheBlockTimeComparator> times_pq;
+    bool (*freqComp)(CacheBlock cb1, CacheBlock cb2) = [](CacheBlock cb1, CacheBlock cb2) {
+        return cb1.req_am < cb2.req_am;
+    };
+    bool (*timeComp)(CacheBlock cb1, CacheBlock cb2) = [](CacheBlock cb1, CacheBlock cb2) {
+        return cb1.access_time < cb2.access_time;
+    };
+
+    std::set<CacheBlock, decltype(freqComp)> freq_pq;
+    std::set<CacheBlock, decltype(timeComp)> times_pq;
+
+    void access(int fd, int page_num);
 
    public:
     PageCache(size_t cache_size_bytes = CACHE_SIZE) : max_cache_bytes_am(cache_size_bytes) {};
     void insertPage(int fd, char* page);
-	
+    bool pageExist(int fd, int page_num);
+    CacheBlock getCached(int fd, int page_num);
+
+    void clearFileCaches(int fd);
 };
 
 #endif
