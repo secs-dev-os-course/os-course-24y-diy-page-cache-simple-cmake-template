@@ -12,7 +12,7 @@
 
 class FilesManager {
     PageCache page_cache;
-    std::unordered_map<int, int> offset_map;  // <fd, offset> for opened files
+    std::unordered_map<int, off_t> offset_map;  // <fd, offset> for opened files
 
    public:
     FilesManager(int cache_size);
@@ -20,7 +20,7 @@ class FilesManager {
     int f_close(int fd);
     ssize_t f_read(int fd, void* buf, size_t count);
     ssize_t f_write(int fd, const void* buf, size_t count);
-    int f_lseek(int fd, int offset, int whence);
+    off_t f_lseek(int fd, int offset, int whence);
     int fsync(int fd);
 };
 

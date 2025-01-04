@@ -7,11 +7,11 @@
 #include <unordered_map>
 
 #define CACHE_SIZE 256 * 1024 * 1024  // Bytes
-#define PAGE_SIZE 4000
+#define PAGE_SIZE 4096
 
 typedef struct CacheBlock {
     int fd;
-    int req_am;
+    int req_am = 0;
     int page_number;
     char* page;
     std::chrono::time_point<std::chrono::steady_clock> access_time;
@@ -42,7 +42,7 @@ class PageCache {
 
    public:
     PageCache(size_t cache_size_bytes = CACHE_SIZE) : max_cache_bytes_am(cache_size_bytes) {};
-    void insertPage(int fd, char* page);
+    void insertPage(int fd, int page_num, char* data);
     bool pageExist(int fd, int page_num);
     CacheBlock getCached(int fd, int page_num);
 

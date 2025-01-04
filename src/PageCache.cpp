@@ -38,6 +38,7 @@ bool PageCache::pageExist(int fd, int page_num) {
 }
 
 CacheBlock PageCache::getCached(int fd, int page_num) {
+    access(fd, page_num);
     return cache_blocks[std::make_pair(fd, page_num)];
 }
 
@@ -52,4 +53,8 @@ void PageCache::access(int fd, int page_num) {
 
     freq_pq.insert(cache_blocks[data]);
     times_pq.insert(cache_blocks[data]);
+}
+
+void PageCache::insertPage(int fd, int page_num, char* data) {
+    
 }

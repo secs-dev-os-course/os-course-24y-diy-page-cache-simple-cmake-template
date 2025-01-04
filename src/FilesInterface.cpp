@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include <cstring>
+#include <iostream>
 
 #include "PageCache.h"
 
@@ -13,7 +14,10 @@ FilesManager::FilesManager(int cache_size) : page_cache(cache_size) {
 
 int FilesManager::f_open(const char* path) {
     int fd = open(path, O_RDWR | O_DIRECT);  // Bypassing OS page cache
-    offset_map.insert(fd, 0);
+    if (fd == -1) {
+        throw std::runtime_error("Error opening file");
+    }
+    offset_map[fd] = static_cast<off_t>(0);
     return fd;
 }
 
@@ -26,6 +30,10 @@ int FilesManager::f_close(int fd) {
 ssize_t FilesManager::f_read(int fd, void* buf, size_t count) {
     char res[count];
 
+    if (offset_map.find(fd) == offset_map.end()) {
+        throw std::runtime_error("Error reading file. Such descriptor not exist!");
+    }
+
     int curr_offset = offset_map[fd];
     int first_page_idx = curr_offset / PAGE_SIZE;
     int last_page_idx = (curr_offset + count) / PAGE_SIZE;
@@ -37,12 +45,16 @@ ssize_t FilesManager::f_read(int fd, void* buf, size_t count) {
         if (page_cache.pageExist(fd, i)) {
             CacheBlock cache_block = page_cache.getCached(fd, i);
 
-            int bytes_am = (bytes_left >= PAGE_SIZE) ? PAGE_SIZE : bytes_left;
-            std::memcpy(res + buff_pos, cache_block.page, bytes_am);
-            buff_pos += bytes_am;
+            int start_pos = curr_offset % PAGE_SIZE;
+            int end_pos = std::min(PAGE_SIZE - 1, start_pos + bytes_left);
 
+            int bytes_am = end_pos - start_pos + 1;
+
+            std::memcpy(res + buff_pos, cache_block.page + start_pos, bytes_am * sizeof(char));
+            buff_pos += bytes_am;
+            bytes_left -= bytes_am;
+            curr_offset += bytes_am;
         } else {
-            
         }
     }
 }
@@ -50,7 +62,18 @@ ssize_t FilesManager::f_read(int fd, void* buf, size_t count) {
 ssize_t FilesManager::f_write(int fd, const void* buf, size_t count) {
 }
 
-int FilesManager::f_lseek(int fd, int offset, int whence) {
+off_t FilesManager::f_lseek(int fd, int offset, int whence) {
+    off_t curr_offset = lseek(fd, offset, whence);
+
+    if (curr_offset < 0) {
+        std::cerr << "Offset error: " << strerror(errno) << std::endl;
+        return curr_offset;
+    }
+
+    offset_map[fd] = curr_offset;
+    int page_idx = curr_offset / PAGE_SIZE;  // TODO: добавить страницу в кэш, если не существует
+
+    return curr_offset;
 }
 
 int FilesManager::fsync(int fd) {
