@@ -12,9 +12,11 @@
 typedef struct CacheBlock {
     int fd;
     int req_am = 0;
-    int page_number;
-    char* page;
+    int page_idx;
+    char* cached_page;
     std::chrono::time_point<std::chrono::steady_clock> access_time;
+
+    ~CacheBlock();
 } CacheBlock;
 
 struct PairHasher {
@@ -23,10 +25,12 @@ struct PairHasher {
     std::size_t operator()(const std::pair<T, U>& x) const;
 };
 
+typedef std::unordered_map<std::pair<int, int>, CacheBlock, PairHasher> cache_map;
+
 class PageCache {
     size_t max_cache_bytes_am;
 
-    std::unordered_map<std::pair<int, int>, CacheBlock, PairHasher> cache_blocks;  // key = <fd, page num>
+    cache_map cache_blocks;  // key = <fd, page num>
 
     bool (*freqComp)(CacheBlock cb1, CacheBlock cb2) = [](CacheBlock cb1, CacheBlock cb2) {
         return cb1.req_am < cb2.req_am;
@@ -42,7 +46,8 @@ class PageCache {
 
    public:
     PageCache(size_t cache_size_bytes = CACHE_SIZE) : max_cache_bytes_am(cache_size_bytes) {};
-    void insertPage(int fd, int page_num, char* data);
+    cache_map* getAllCached();
+    void cachePage(int fd, int page_num);
     bool pageExist(int fd, int page_num);
     CacheBlock getCached(int fd, int page_num);
 
