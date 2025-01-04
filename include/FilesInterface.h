@@ -7,9 +7,6 @@
 
 #include "PageCache.h"
 
-#define CACHE_SIZE 256 * 1024 * 1024  // Bytes
-#define PAGE_SIZE 4000
-
 class FilesManager {
     PageCache page_cache;
     std::unordered_map<int, off_t> offset_map;  // <fd, offset> for opened files

@@ -21,15 +21,13 @@ int FilesManager::f_open(const char* path) {
     return fd;
 }
 
-int FilesManager::f_close(int fd) {
+int FilesManager::f_close(int fd) {  // TODO: Возможно синхронизация...
     page_cache.clearFileCaches(fd);
     offset_map.erase(fd);
     close(fd);
 }
 
 ssize_t FilesManager::f_read(int fd, void* buf, size_t count) {
-    char res[count];
-
     if (offset_map.find(fd) == offset_map.end()) {
         throw std::runtime_error("Error reading file. Such descriptor not exist!");
     }
@@ -41,7 +39,7 @@ ssize_t FilesManager::f_read(int fd, void* buf, size_t count) {
     int bytes_left = count;
     int buff_pos = 0;
 
-    for (int i = first_page_idx; i <= last_page_idx; i++) {  // TODO: Align buffer!
+    for (int i = first_page_idx; i <= last_page_idx; i++) {
         if (!page_cache.pageExist(fd, i)) {
             int page_first_pos = i * PAGE_SIZE;
             f_lseek(fd, page_first_pos, SEEK_SET);
@@ -52,7 +50,7 @@ ssize_t FilesManager::f_read(int fd, void* buf, size_t count) {
         int end_pos = std::min(PAGE_SIZE - 1, start_pos + bytes_left);
         int bytes_am = end_pos - start_pos + 1;
 
-        std::memcpy(res + buff_pos, cache_block.cached_page + start_pos, bytes_am * sizeof(char));
+        std::memcpy(static_cast<char*>(buf) + buff_pos, cache_block.cached_page + start_pos, bytes_am * sizeof(char));
         buff_pos += bytes_am;
         bytes_left -= bytes_am;
         curr_offset += bytes_am;
@@ -60,6 +58,7 @@ ssize_t FilesManager::f_read(int fd, void* buf, size_t count) {
 }
 
 ssize_t FilesManager::f_write(int fd, const void* buf, size_t count) {
+    fsync(fd);
 }
 
 off_t FilesManager::f_lseek(int fd, int offset, int whence) {
@@ -79,23 +78,5 @@ off_t FilesManager::f_lseek(int fd, int offset, int whence) {
 }
 
 int FilesManager::fsync(int fd) {
-    cache_map* cached_blocks = page_cache.getAllCached();
-    for (auto it = cached_blocks->begin(); it != cached_blocks->end(); it++) {
-        int block_fd = it->first.first;
-        if (block_fd != fd) continue;
-
-        int page_idx = it->first.second;
-        int page_start_pos = page_idx * PAGE_SIZE;
-
-        if (lseek(fd, page_start_pos, SEEK_SET) == -1) {
-            return -1;
-        }
-        if (write(fd, it->second.cached_page, PAGE_SIZE) != PAGE_SIZE) {
-            return -1;
-        }
-    }
-    if (lseek(fd, offset_map[fd], SEEK_SET) == -1) {
-        return -1;
-    }
-    return 0;
+    page_cache.syncBlocks(fd);
 }

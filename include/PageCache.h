@@ -11,9 +11,10 @@
 
 typedef struct CacheBlock {
     int fd;
-    int req_am = 0;
+    int req_am;
     int page_idx;
     char* cached_page;
+    bool is_modified;
     std::chrono::time_point<std::chrono::steady_clock> access_time;
 
     ~CacheBlock();
@@ -28,28 +29,29 @@ struct PairHasher {
 typedef std::unordered_map<std::pair<int, int>, CacheBlock, PairHasher> cache_map;
 
 class PageCache {
-    size_t max_cache_bytes_am;
+    size_t max_cache_pages_am;
 
     cache_map cache_blocks;  // key = <fd, page num>
 
-    bool (*freqComp)(CacheBlock cb1, CacheBlock cb2) = [](CacheBlock cb1, CacheBlock cb2) {
+    bool (*lfuComparator)(CacheBlock cb1, CacheBlock cb2) = [](CacheBlock cb1, CacheBlock cb2) {
+        if (cb1.req_am == cb2.req_am) {
+            return cb1.access_time < cb2.access_time;
+        }
         return cb1.req_am < cb2.req_am;
     };
-    bool (*timeComp)(CacheBlock cb1, CacheBlock cb2) = [](CacheBlock cb1, CacheBlock cb2) {
-        return cb1.access_time < cb2.access_time;
-    };
 
-    std::set<CacheBlock, decltype(freqComp)> freq_pq;
-    std::set<CacheBlock, decltype(timeComp)> times_pq;
+    std::set<CacheBlock, decltype(lfuComparator)> priority_queue;
 
-    void access(int fd, int page_num);
+    void syncBlock(int fd, int page_idx);
+    void displaceBlock();
+    void access(int fd, int page_idx);
 
    public:
-    PageCache(size_t cache_size_bytes = CACHE_SIZE) : max_cache_bytes_am(cache_size_bytes) {};
-    cache_map* getAllCached();
-    void cachePage(int fd, int page_num);
-    bool pageExist(int fd, int page_num);
-    CacheBlock getCached(int fd, int page_num);
+    PageCache(size_t cache_size_bytes);
+    void syncBlocks(int fd);
+    void cachePage(int fd, int page_idx);
+    bool pageExist(int fd, int page_idx);
+    CacheBlock getCached(int fd, int page_idx);
 
     void clearFileCaches(int fd);
 };
