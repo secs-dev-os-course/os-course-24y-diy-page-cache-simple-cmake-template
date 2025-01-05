@@ -3,11 +3,12 @@
 #include <unistd.h>
 
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <utility>
 
 CacheBlock::~CacheBlock() {
-    delete[] cached_page;
+    free(cached_page);
 }
 
 template <typename T, typename U>
@@ -29,7 +30,7 @@ void PageCache::clearFileCaches(int fd) {
     }
 
     for (auto it = priority_queue.begin(); it != priority_queue.end();) {
-        if (it->fd == fd) {
+        if (it->get()->fd == fd) {
             it = priority_queue.erase(it);
         } else {
             it++;
@@ -41,53 +42,59 @@ bool PageCache::pageExist(int fd, int page_idx) {
     return cache_blocks.find(std::make_pair(fd, page_idx)) != cache_blocks.end();
 }
 
-CacheBlock PageCache::getCached(int fd, int page_idx) {
-    access(fd, page_idx);
-    return cache_blocks[std::make_pair(fd, page_idx)];
+std::optional<std::shared_ptr<CacheBlock>> PageCache::getCached(int fd, int page_idx) {
+    std::pair<int, int> key = std::make_pair(fd, page_idx);
+    if (cache_blocks.find(key) != cache_blocks.end()) {
+        access(fd, page_idx);
+        return std::make_optional(cache_blocks[key]);
+    }
+    return std::nullopt;
 }
 
 void PageCache::access(int fd, int page_idx) {
-    std::pair<int, int> data = std::make_pair(fd, page_idx);
+    std::pair<int, int> key = std::make_pair(fd, page_idx);
 
-    priority_queue.erase(cache_blocks[data]);
+    std::shared_ptr<CacheBlock> cache_block = cache_blocks[key];
+    cache_block.get()->access_time = std::chrono::steady_clock::now();
+    cache_block.get()->req_am++;
 
-    cache_blocks[data].access_time = std::chrono::steady_clock::now();
-    cache_blocks[data].req_am++;
+    cache_blocks.erase(key);
+    priority_queue.erase(cache_block);
 
-    priority_queue.insert(cache_blocks[data]);
+    cache_blocks[key] = cache_block;
+    priority_queue.insert(cache_block);
+}
+
+void PageCache::rmPage(int fd, int page_idx) {
+    std::pair<int, int> key = std::make_pair(fd, page_idx);
+    std::shared_ptr<CacheBlock> cache_block = cache_blocks[key];
+
+    priority_queue.erase(cache_block);
+    cache_blocks.erase(key);
 }
 
 void PageCache::cachePage(int fd, int page_idx) {
-    if (pageExist(fd, page_idx)) {
-        access(fd, page_idx);
-        return;
-    } else if (cache_blocks.size() > max_cache_pages_am) {
+    if (cache_blocks.size() > max_cache_pages_am) {
         displaceBlock();
     }
 
     int page_start_pos = page_idx * PAGE_SIZE;
 
-    char* raw_buf = nullptr;
-    if (posix_memalign(reinterpret_cast<void**>(&raw_buf), PAGE_SIZE, PAGE_SIZE) != 0) {
+    char* buf;
+    if (posix_memalign(reinterpret_cast<void**>(&buf), PAGE_SIZE, PAGE_SIZE) != 0) {
         throw std::runtime_error("Failed to allocate aligned memory");
     }
-    std::unique_ptr<char[]> buf(raw_buf);
 
     if (lseek(fd, page_start_pos, SEEK_SET) == -1) {
         throw std::runtime_error("Error seek in file!");
     }
 
-    ssize_t res = read(fd, buf.get(), PAGE_SIZE);
+    ssize_t res = read(fd, buf, PAGE_SIZE);
     if (res != PAGE_SIZE) {
         throw std::runtime_error("Error reading file!");
     }
 
-    CacheBlock cache_block = {.fd = fd,
-                              .req_am = 0,
-                              .page_idx = page_idx,
-                              .cached_page = buf.release(),
-                              .is_modified = false,
-                              .access_time = std::chrono::steady_clock::now()};
+    auto cache_block = std::make_shared<CacheBlock>(fd, 0, page_idx, buf);
 
     cache_blocks[std::make_pair(fd, page_idx)] = cache_block;
     priority_queue.insert(cache_block);
@@ -99,7 +106,7 @@ void PageCache::syncBlock(int fd, int page_idx) {
     if (lseek(fd, page_start_pos, SEEK_SET) == -1) {
         throw std::runtime_error("Sync with external disk error.");
     }
-    if (write(fd, cache_blocks[std::make_pair(fd, page_idx)].cached_page, PAGE_SIZE) != PAGE_SIZE) {
+    if (write(fd, cache_blocks[std::make_pair(fd, page_idx)].get()->cached_page, PAGE_SIZE) != PAGE_SIZE) {
         throw std::runtime_error("Sync with external disk error.");
     }
 }
@@ -123,8 +130,9 @@ void PageCache::displaceBlock() {
     auto to_displace = priority_queue.begin();
     if (to_displace == priority_queue.end()) return;
 
-    cache_blocks.erase(std::make_pair((*to_displace).fd, (*to_displace).page_idx));
-    priority_queue.erase(to_displace);
+    int fd = (*to_displace).get()->fd;
+    int page_idx = (*to_displace).get()->page_idx;
 
-    // Sync with file...
+    syncBlock(fd, page_idx);
+    rmPage(fd, page_idx);
 }

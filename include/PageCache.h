@@ -2,6 +2,8 @@
 #define PAGE_CACHE
 
 #include <chrono>
+#include <memory>
+#include <optional>
 #include <queue>
 #include <set>
 #include <unordered_map>
@@ -14,9 +16,13 @@ typedef struct CacheBlock {
     int req_am;
     int page_idx;
     char* cached_page;
-    bool is_modified;
     std::chrono::time_point<std::chrono::steady_clock> access_time;
-
+    CacheBlock(int fd = 0, int req_am = 0, int page_idx = 0, char* cached_page = nullptr)
+        : fd(fd),
+          req_am(req_am),
+          page_idx(page_idx),
+          cached_page(cached_page),
+          access_time(std::chrono::steady_clock::now()) {};
     ~CacheBlock();
 } CacheBlock;
 
@@ -26,12 +32,13 @@ struct PairHasher {
     std::size_t operator()(const std::pair<T, U>& x) const;
 };
 
-typedef std::unordered_map<std::pair<int, int>, CacheBlock, PairHasher> cache_map;
+typedef std::unordered_map<std::pair<int, int>, std::shared_ptr<CacheBlock>, PairHasher>
+    cache_map;  // key = <fd, page num>
 
 class PageCache {
     size_t max_cache_pages_am;
 
-    cache_map cache_blocks;  // key = <fd, page num>
+    cache_map cache_blocks;
 
     bool (*lfuComparator)(CacheBlock cb1, CacheBlock cb2) = [](CacheBlock cb1, CacheBlock cb2) {
         if (cb1.req_am == cb2.req_am) {
@@ -40,10 +47,11 @@ class PageCache {
         return cb1.req_am < cb2.req_am;
     };
 
-    std::set<CacheBlock, decltype(lfuComparator)> priority_queue;
+    std::set<std::shared_ptr<CacheBlock>, decltype(lfuComparator)> priority_queue;
 
     void syncBlock(int fd, int page_idx);
     void displaceBlock();
+    void rmPage(int fd, int page_idx);
     void access(int fd, int page_idx);
 
    public:
@@ -51,7 +59,7 @@ class PageCache {
     void syncBlocks(int fd);
     void cachePage(int fd, int page_idx);
     bool pageExist(int fd, int page_idx);
-    CacheBlock getCached(int fd, int page_idx);
+    std::optional<std::shared_ptr<CacheBlock>> getCached(int fd, int page_idx);
 
     void clearFileCaches(int fd);
 };
