@@ -25,7 +25,7 @@ int FilesManager::f_close(int fd) {
     fsync(fd);
     page_cache.clearFileCaches(fd);
     offset_map.erase(fd);
-    close(fd);
+    return close(fd);
 }
 
 ssize_t FilesManager::f_read(int fd, void* buf, size_t count) {
@@ -41,7 +41,7 @@ ssize_t FilesManager::f_read(int fd, void* buf, size_t count) {
     int buff_pos = 0;
 
     for (int i = first_page_idx; i <= last_page_idx; i++) {
-        std::optional<std::shared_ptr<CacheBlock>> cache_block_opt = page_cache.getCached(fd, i);
+        std::optional<CacheBlock> cache_block_opt = page_cache.getCached(fd, i);
         if (cache_block_opt == std::nullopt) {
             page_cache.cachePage(fd, i);
             cache_block_opt = page_cache.getCached(fd, i);
@@ -51,7 +51,7 @@ ssize_t FilesManager::f_read(int fd, void* buf, size_t count) {
         int end_pos = std::min(PAGE_SIZE - 1, start_pos + bytes_left);
         int bytes_am = end_pos - start_pos + 1;
 
-        std::memcpy(static_cast<char*>(buf) + buff_pos, cache_block_opt.value().get()->cached_page + start_pos,
+        std::memcpy(static_cast<char*>(buf) + buff_pos, cache_block_opt->cached_page.get() + start_pos,
                     bytes_am * sizeof(char));
 
         buff_pos += bytes_am;
@@ -63,10 +63,6 @@ ssize_t FilesManager::f_read(int fd, void* buf, size_t count) {
 }
 
 ssize_t FilesManager::f_write(int fd, const void* buf, size_t count) {
-    if (posix_memalign((void**)(buf), PAGE_SIZE, count) != 0) {
-        throw std::runtime_error("Failed to align buffer memory");
-    }
-
     if (offset_map.find(fd) == offset_map.end()) {
         throw std::runtime_error("Error writing to file. Such descriptor not exist!");
     }
@@ -79,7 +75,7 @@ ssize_t FilesManager::f_write(int fd, const void* buf, size_t count) {
     int buff_pos = 0;
 
     for (int i = first_page_idx; i <= last_page_idx; i++) {
-        std::optional<std::shared_ptr<CacheBlock>> cache_block_opt = page_cache.getCached(fd, i);
+        std::optional<CacheBlock> cache_block_opt = page_cache.getCached(fd, i);
         if (cache_block_opt == std::nullopt) {
             page_cache.cachePage(fd, i);
             cache_block_opt = page_cache.getCached(fd, i);
@@ -89,7 +85,7 @@ ssize_t FilesManager::f_write(int fd, const void* buf, size_t count) {
         int end_pos = std::min(PAGE_SIZE - 1, start_pos + bytes_left);
         int bytes_am = end_pos - start_pos + 1;
 
-        std::memcpy(cache_block_opt.value().get()->cached_page + start_pos, static_cast<const char*>(buf) + buff_pos,
+        std::memcpy(cache_block_opt.value().cached_page.get() + start_pos, static_cast<const char*>(buf) + buff_pos,
                     bytes_am * sizeof(char));
         buff_pos += bytes_am;
         bytes_left -= bytes_am;
@@ -113,4 +109,5 @@ off_t FilesManager::f_lseek(int fd, int offset, int whence) {
 
 int FilesManager::fsync(int fd) {
     page_cache.syncBlocks(fd);
+    return 0;
 }
