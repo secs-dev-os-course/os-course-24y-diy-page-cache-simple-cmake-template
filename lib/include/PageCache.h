@@ -40,12 +40,13 @@ class PageCache {
 
     cache_map cache_blocks;
 
-    bool (*lfuComparator)(CacheBlock cb1, CacheBlock cb2) = [](CacheBlock cb1, CacheBlock cb2) {
-        if (cb1.req_am == cb2.req_am) {
-            return cb1.access_time < cb2.access_time;
-        }
-        return cb1.req_am < cb2.req_am;
-    };
+    bool (*lfuComparator)(std::shared_ptr<CacheBlock> cb1, std::shared_ptr<CacheBlock> cb2) =
+        [](std::shared_ptr<CacheBlock> cb1, std::shared_ptr<CacheBlock> cb2) {
+            if (cb1.get()->req_am == cb2.get()->req_am) {
+                return cb1.get()->access_time < cb2.get()->access_time;
+            }
+            return cb1.get()->req_am < cb2.get()->req_am;
+        };
 
     std::set<std::shared_ptr<CacheBlock>, decltype(lfuComparator)> priority_queue;
 

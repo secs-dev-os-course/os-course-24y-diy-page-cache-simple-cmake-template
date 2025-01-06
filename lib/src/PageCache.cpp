@@ -102,6 +102,7 @@ void PageCache::cachePage(int fd, int page_idx) {
 
 void PageCache::syncBlock(int fd, int page_idx) {
     int page_start_pos = page_idx * PAGE_SIZE;
+    off_t curr_offset = lseek(fd, 0, SEEK_CUR);
 
     if (lseek(fd, page_start_pos, SEEK_SET) == -1) {
         throw std::runtime_error("Sync with external disk error.");
@@ -109,19 +110,18 @@ void PageCache::syncBlock(int fd, int page_idx) {
     if (write(fd, cache_blocks[std::make_pair(fd, page_idx)].get()->cached_page, PAGE_SIZE) != PAGE_SIZE) {
         throw std::runtime_error("Sync with external disk error.");
     }
+    if (lseek(fd, curr_offset, SEEK_SET) == -1) {
+        throw std::runtime_error("Sync with external disk error.");
+    }
 }
 
 void PageCache::syncBlocks(int fd) {
-    off_t curr_offset = lseek(fd, 0, SEEK_CUR);
     for (auto it = cache_blocks.begin(); it != cache_blocks.end(); it++) {
         int block_fd = it->first.first;
         if (block_fd != fd) continue;
 
         int page_idx = it->first.second;
         syncBlock(fd, page_idx);
-    }
-    if (lseek(fd, curr_offset, SEEK_SET) == -1) {
-        throw std::runtime_error("Sync with external disk error.");
     }
     return;
 }
