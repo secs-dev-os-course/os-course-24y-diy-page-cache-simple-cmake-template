@@ -91,6 +91,9 @@ static void BM_FilesManager(benchmark::State& state) {
             return;
         }
 
+        // Not closing files bench
+        // files_manager.f_lseek(fd, 0, SEEK_SET);
+
         std::vector<char> buffer(data_size);
         if (files_manager.f_read(fd, buffer.data(), data_size) == -1) {
             std::cerr << "Error reading from file!" << std::endl;
@@ -170,7 +173,6 @@ static void BM_SystemCalls_O_DIRECT(benchmark::State& state) {
     free(write_buffer);
     free(read_buffer);
 }
-
 BENCHMARK(BM_SystemCalls_O_DIRECT);
 
 BENCHMARK_MAIN();
