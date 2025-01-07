@@ -1,4 +1,6 @@
 .*
 !.gitignore
 
-build/
+build
+
+todo.md
