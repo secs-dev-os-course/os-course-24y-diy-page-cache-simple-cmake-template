@@ -15,10 +15,11 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define MAX_OPEN_FILES 1256
-#define BLOCK_SIZE 4096
-#define CACHE_SIZE 1024
+#define MAX_OPEN_FILES 256
+#define BLOCK_SIZE 2048
+#define CACHE_SIZE 768
 
+// ABCD ABCD ABCD
 
 typedef struct Key {
   dev_t dev; 
@@ -31,13 +32,6 @@ typedef struct Meta {
   int fd;
 } Meta;
 
-// typedef struct Block {
-//   Key file_key;
-//   off_t block_start;
-//   int frequency;
-//   int is_dirty;
-//   void* data;
-// } Block;
 
 typedef struct Block {
   Key file_key;
@@ -162,6 +156,7 @@ int evict_block() {
         memset(&cache[index_to_evict], 0, sizeof(Block));
     }
 
+    // printf("DEL %c\n", 'A' + index_to_evict);
     return index_to_evict;
 }
 
@@ -219,7 +214,6 @@ int load_block_into_cache(Key* key, off_t block_offset, size_t* out_bytes_read, 
 
     return index_in_cache;
 }
-
 
 // Сохранение измененных блоков
 int flush_dirty_blocks(Key* key) {
@@ -303,6 +297,8 @@ ssize_t lab2_read(int fd, void* buffer, size_t byte_count, int access_time) {
     }
 
     file_meta->pointer = current_pointer;
+    // printf("pointer = %d\n", (int)current_pointer);
+
     pthread_mutex_unlock(&cache_lock);
     return total_bytes_read;
 }
@@ -347,10 +343,14 @@ ssize_t lab2_write(int fd, const void* buffer, size_t length, int access_time) {
             }
         }
 
+        // Обновляем данные в кэше
         memcpy(cache[index_within_cache].data + offset_within_block,
                buffer + total_bytes_written, block_remaining_space);
+
+        // Обновляем метаданные блока в кэше
         cache[index_within_cache].frequency++;
-        cache[index_within_cache].is_dirty = 1;
+        cache[index_within_cache].next_access_time = access_time;  // Обновление временного штампа
+        cache[index_within_cache].is_dirty = 1; // Отметка, что блок изменен и нужно будет записать
 
         total_bytes_written += block_remaining_space;
         length -= block_remaining_space;
@@ -361,7 +361,6 @@ ssize_t lab2_write(int fd, const void* buffer, size_t length, int access_time) {
     pthread_mutex_unlock(&cache_lock);
     return total_bytes_written;
 }
-
 
 // Реализация API
 int lab2_open(const char* file_path, int access_flags, int file_mode) {

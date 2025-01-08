@@ -31,22 +31,14 @@ typedef struct Meta {
   int fd;
 } Meta;
 
-// typedef struct Block {
-//   Key file_key;
-//   off_t block_start;
-//   int frequency;
-//   int is_dirty;
-//   void* data;
-// } Block;
-
 typedef struct Block {
   Key file_key;
   off_t block_start;
   int frequency;
   int is_dirty;
   void* data;
-  int next_access_time;
 } Block;
+
 
 // Глобальные переменные
 Block cache[CACHE_SIZE];
