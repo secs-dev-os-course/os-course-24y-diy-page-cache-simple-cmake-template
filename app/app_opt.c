@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 
-#include "app.h"
+#include "app_opt.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -16,9 +16,10 @@
 #include <sys/types.h>
 
 #define MAX_OPEN_FILES 256
-#define BLOCK_SIZE 4096
-#define CACHE_SIZE 1024
+#define BLOCK_SIZE 2048
+#define CACHE_SIZE 768
 
+// ABCD ABCD ABCD
 
 typedef struct Key {
   dev_t dev; 
@@ -31,14 +32,15 @@ typedef struct Meta {
   int fd;
 } Meta;
 
+
 typedef struct Block {
   Key file_key;
   off_t block_start;
   int frequency;
   int is_dirty;
   void* data;
+  int next_access_time;
 } Block;
-
 
 // Глобальные переменные
 Block cache[CACHE_SIZE];
@@ -109,44 +111,56 @@ int find_block_in_cache(Key* file_key, off_t block_offset) {
     return -1;
 }
 
-// Удаление блока из кэша
 int evict_block() {
-    int least_used_index = -1;
-    int lowest_frequency = INT32_MAX;
+    int index_to_evict = -1;
+    int max_access_time = -1;
 
+    // Сначала ищем блок с next_access_time равным -1
     for (int idx = 0; idx < CACHE_SIZE; idx++) {
-        if (cache[idx].frequency < lowest_frequency) {
-            lowest_frequency = cache[idx].frequency;
-            least_used_index = idx;
+        if (cache[idx].next_access_time == -1) {
+            index_to_evict = idx;
+            break;
         }
     }
 
-    if (cache[least_used_index].is_dirty) {
-        int file_descriptor = -1;
-        for (int j = 0; j < MAX_OPEN_FILES; j++) {
-            if (file_metadata[j].file_key.inode == cache[least_used_index].file_key.inode &&
-                file_metadata[j].file_key.dev == cache[least_used_index].file_key.dev) {
-                file_descriptor = file_metadata[j].fd;
-                break;
+    // Если таких блоков нет, выбираем блок с наибольшим next_access_time
+    if (index_to_evict == -1) {
+        for (int idx = 0; idx < CACHE_SIZE; idx++) {
+            if (cache[idx].next_access_time > max_access_time) {
+                max_access_time = cache[idx].next_access_time;
+                index_to_evict = idx;
+            }
+        }
+    }
+
+    // Обработка в случае, если блок для вытеснения все же найден
+    if (index_to_evict >= 0) {
+        if (cache[index_to_evict].is_dirty) {
+            int file_descriptor = -1;
+            for (int j = 0; j < MAX_OPEN_FILES; j++) {
+                if (file_metadata[j].file_key.inode == cache[index_to_evict].file_key.inode &&
+                    file_metadata[j].file_key.dev == cache[index_to_evict].file_key.dev) {
+                    file_descriptor = file_metadata[j].fd;
+                    break;
+                }
+            }
+
+            if (file_descriptor < 0 ||
+                pwrite(file_descriptor, cache[index_to_evict].data, BLOCK_SIZE, cache[index_to_evict].block_start) < 0) {
+                perror("evict_block: unable to commit block to file");
+                return -1;
             }
         }
 
-        if (file_descriptor < 0 ||
-            pwrite(file_descriptor, cache[least_used_index].data, BLOCK_SIZE, cache[least_used_index].block_start) < 0) {
-            perror("evict_block: unable to commit block to file");
-            return -1;
-        }
+        free(cache[index_to_evict].data);
+        memset(&cache[index_to_evict], 0, sizeof(Block));
     }
 
-    free(cache[least_used_index].data);
-    memset(&cache[least_used_index], 0, sizeof(Block));
-    return least_used_index;
+    // printf("DEL %c\n", 'A' + index_to_evict);
+    return index_to_evict;
 }
 
-
-
-// Кэширование блока файла
-int load_block_into_cache(Key* key, off_t block_offset, size_t* out_bytes_read, bool prefetch) {
+int load_block_into_cache(Key* key, off_t block_offset, size_t* out_bytes_read, bool prefetch, int access_time) {
     int file_desc = -1;
     for (int index = 0; index < MAX_OPEN_FILES; index++) {
         if (file_metadata[index].file_key.inode == key->inode &&
@@ -195,12 +209,11 @@ int load_block_into_cache(Key* key, off_t block_offset, size_t* out_bytes_read, 
     cache[index_in_cache].data = buffer;
     cache[index_in_cache].file_key = *key;
     cache[index_in_cache].block_start = block_offset;
-    cache[index_in_cache].frequency = 1;
+    cache[index_in_cache].next_access_time = access_time;
     cache[index_in_cache].is_dirty = 0;
 
     return index_in_cache;
 }
-
 
 // Сохранение измененных блоков
 int flush_dirty_blocks(Key* key) {
@@ -226,9 +239,7 @@ int flush_dirty_blocks(Key* key) {
     return 0;
 }
 
-
-// Функция выполнения операции чтения из файла
-ssize_t lab2_read(int fd, void* buffer, size_t byte_count) {
+ssize_t lab2_read(int fd, void* buffer, size_t byte_count, int access_time) {
     pthread_mutex_lock(&cache_lock);
 
     Meta* file_meta = NULL;
@@ -260,7 +271,8 @@ ssize_t lab2_read(int fd, void* buffer, size_t byte_count) {
         size_t bytes_fetched = 0;
 
         if (cache_pos < 0) {
-            cache_pos = load_block_into_cache(&file_key, block_start_offset, &bytes_fetched, false);
+            // Передаем access_time в функцию загрузки блока
+            cache_pos = load_block_into_cache(&file_key, block_start_offset, &bytes_fetched, false, access_time);
             if (cache_pos < 0) {
                 file_meta->pointer += total_bytes_read;
                 pthread_mutex_unlock(&cache_lock);
@@ -275,7 +287,9 @@ ssize_t lab2_read(int fd, void* buffer, size_t byte_count) {
             break;
         }
         memcpy(buffer + total_bytes_read, cache[cache_pos].data + offset_within_block, block_remaining);
-        cache[cache_pos].frequency++;
+
+        // Обновляем next_access_time для блоков, которые читаются
+        cache[cache_pos].next_access_time = access_time;
 
         total_bytes_read += block_remaining;
         byte_count -= block_remaining;
@@ -283,13 +297,14 @@ ssize_t lab2_read(int fd, void* buffer, size_t byte_count) {
     }
 
     file_meta->pointer = current_pointer;
+    // printf("pointer = %d\n", (int)current_pointer);
+
     pthread_mutex_unlock(&cache_lock);
     return total_bytes_read;
 }
 
-
 // Функция записи в файл
-ssize_t lab2_write(int fd, const void* buffer, size_t length) {
+ssize_t lab2_write(int fd, const void* buffer, size_t length, int access_time) {
     pthread_mutex_lock(&cache_lock);
 
     Meta* file_info = NULL;
@@ -320,7 +335,7 @@ ssize_t lab2_write(int fd, const void* buffer, size_t length) {
         int index_within_cache = find_block_in_cache(&file_key, block_start_offset);
         if (index_within_cache < 0) {
             size_t unused_bytes_read = 0;
-            index_within_cache = load_block_into_cache(&file_key, block_start_offset, &unused_bytes_read, true);
+            index_within_cache = load_block_into_cache(&file_key, block_start_offset, &unused_bytes_read, true, access_time);
             if (index_within_cache < 0) {
                 file_info->pointer += total_bytes_written;
                 pthread_mutex_unlock(&cache_lock);
@@ -328,10 +343,14 @@ ssize_t lab2_write(int fd, const void* buffer, size_t length) {
             }
         }
 
+        // Обновляем данные в кэше
         memcpy(cache[index_within_cache].data + offset_within_block,
                buffer + total_bytes_written, block_remaining_space);
+
+        // Обновляем метаданные блока в кэше
         cache[index_within_cache].frequency++;
-        cache[index_within_cache].is_dirty = 1;
+        cache[index_within_cache].next_access_time = access_time;  // Обновление временного штампа
+        cache[index_within_cache].is_dirty = 1; // Отметка, что блок изменен и нужно будет записать
 
         total_bytes_written += block_remaining_space;
         length -= block_remaining_space;
@@ -342,7 +361,6 @@ ssize_t lab2_write(int fd, const void* buffer, size_t length) {
     pthread_mutex_unlock(&cache_lock);
     return total_bytes_written;
 }
-
 
 // Реализация API
 int lab2_open(const char* file_path, int access_flags, int file_mode) {
