@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include "app.h"
+#include "app_opt.h"
 
 void perform_test(const char* path, int buffer_size, int num_iterations) {
     int file_desc = lab2_open(path, O_RDONLY, 0644);
@@ -28,7 +28,7 @@ void perform_test(const char* path, int buffer_size, int num_iterations) {
         ssize_t read_bytes;
 
 
-        while ((read_bytes = lab2_read(file_desc, read_buffer, buffer_size)) > 0) {
+        while ((read_bytes = lab2_read(file_desc, read_buffer, buffer_size, -1)) > 0) {
             bytes_total_read += read_bytes;
         }
 

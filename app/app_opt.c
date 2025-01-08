@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 
-#include "app.h"
+#include "app_opt.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -284,6 +284,8 @@ ssize_t lab2_read(int fd, void* buffer, size_t byte_count, int access_time) {
                 pthread_mutex_unlock(&cache_lock);
                 return bytes_fetched >= 0 ? total_bytes_read : -1;
             }
+        } else {
+            bytes_fetched = BLOCK_SIZE;
         }
 
         block_remaining = block_remaining > bytes_fetched ? bytes_fetched : block_remaining;

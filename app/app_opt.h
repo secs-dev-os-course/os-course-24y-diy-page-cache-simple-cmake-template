@@ -1,5 +1,5 @@
-#ifndef APP_H
-#define APP_H
+#ifndef APP_OPT_H
+#define APP_OPT_H
 
 #include <fcntl.h> 
 #include <stddef.h> 
@@ -13,4 +13,4 @@ ssize_t lab2_write(int file_descriptor, const void* buffer, size_t byte_count, i
 off_t lab2_lseek(int file_descriptor, off_t position, int reference_point);
 int lab2_fsync(int file_descriptor);
 
-#endif // APP_H
+#endif // APP_OPT_H
