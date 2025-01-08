@@ -22,9 +22,11 @@ void perform_test(const char* path, int buffer_size, int num_iterations) {
     size_t bytes_total_read = 0;
     clock_t start_clock = clock();
 
+    int next_access = 0;
     for (int i = 0; i < num_iterations; i++) {
         off_t seek_offset = lab2_lseek(file_desc, 0, SEEK_SET);
         ssize_t read_bytes;
+
 
         while ((read_bytes = lab2_read(file_desc, read_buffer, buffer_size)) > 0) {
             bytes_total_read += read_bytes;
