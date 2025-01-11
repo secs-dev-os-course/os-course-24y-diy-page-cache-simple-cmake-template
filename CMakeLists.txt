@@ -1,15 +1,18 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.10)
 
-project(my-project
-        VERSION 0.0.0
-        DESCRIPTION "My best project"
-        LANGUAGES C CXX
-)
+project(PageCacheLib LANGUAGES CXX)
 
-set(CMAKE_C_STANDARD 23)
-set(CMAKE_C_STANDARD_REQUIRED True)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+include(FetchContent)
 
-add_subdirectory(app)
+file(GLOB LIB_SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/lib/src/*.cpp)
+file(GLOB LIB_HEADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/lib/include/*.h)
+set(LIB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/include)
+
+add_library(PageCacheLib STATIC ${LIB_SRC_FILES} ${LIB_HEADER_FILES})
+target_include_directories(PageCacheLib PUBLIC ${LIB_INCLUDE_DIR})
+
+add_subdirectory(tests)
+add_subdirectory(benchmark)
