@@ -11,19 +11,31 @@
 #define CACHE_SIZE 256 * 1024 * 1024  // Bytes
 #define PAGE_SIZE 4096
 
-typedef struct CacheBlock {
+struct CacheBlock {
     int fd;
     int req_am;
     int page_idx;
-    std::shared_ptr<char[]> cached_page;
+    std::unique_ptr<char[], decltype(&free)> cached_page;
     std::chrono::time_point<std::chrono::steady_clock> access_time;
-    CacheBlock(int fd = 0, int req_am = 0, int page_idx = 0, std::shared_ptr<char[]> cached_page = nullptr)
+    CacheBlock(int fd = 0, int req_am = 0, int page_idx = 0, std::unique_ptr<char[], decltype(&free)> cached_page = std::unique_ptr<char[], decltype(&free)>(nullptr, &free))
         : fd(fd),
           req_am(req_am),
           page_idx(page_idx),
-          cached_page(cached_page),
+          cached_page(std::move(cached_page)),
           access_time(std::chrono::steady_clock::now()) {};
-} CacheBlock;
+
+    CacheBlock(CacheBlock&& other) noexcept
+        : fd(other.fd),
+          req_am(other.req_am),
+          page_idx(other.page_idx),
+          cached_page(std::move(other.cached_page)),
+          access_time(other.access_time) {
+        other.fd = 0;
+        other.req_am = 0;
+        other.page_idx = 0;
+    }
+
+};
 
 struct PairHasher {
    public:
@@ -39,15 +51,15 @@ class PageCache {
     cache_map cache_blocks;
 
     struct LFUComparator {
-        bool operator()(const CacheBlock& cb1, const CacheBlock& cb2) const {
-            if (cb1.req_am == cb2.req_am) {
-                return cb1.access_time < cb2.access_time;
+        bool operator()(const CacheBlock* cb1, const CacheBlock* cb2) const {
+            if (cb1->req_am == cb2->req_am) {
+                return cb1->access_time < cb2->access_time;
             }
-            return cb1.req_am < cb2.req_am;
+            return cb1->req_am < cb2->req_am;
         }
     };
 
-    std::set<CacheBlock, LFUComparator> priority_queue;
+    std::set<CacheBlock*, LFUComparator> priority_queue;
 
     void syncBlock(int fd, int page_idx);
     void displaceBlock();
@@ -59,7 +71,7 @@ class PageCache {
     void syncBlocks(int fd);
     void cachePage(int fd, int page_idx);
     bool pageExist(int fd, int page_idx);
-    std::optional<CacheBlock> getCached(int fd, int page_idx);
+    CacheBlock* getCached(int fd, int page_idx);
 
     void clearFileCaches(int fd);
 };

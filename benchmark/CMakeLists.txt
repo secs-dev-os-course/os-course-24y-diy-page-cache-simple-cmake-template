@@ -20,7 +20,7 @@ file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_executable(Benchmarks ${SOURCES})
 
-add_dependencies(Benchmarks TapeSortl)
+add_dependencies(Benchmarks PageCacheLib)
 
-target_link_libraries(Benchmarks benchmark::benchmark TapeSortl)
+target_link_libraries(Benchmarks benchmark::benchmark PageCacheLib)
 
