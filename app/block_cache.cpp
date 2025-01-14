@@ -106,9 +106,9 @@ ssize_t BlockCache::write(int fd, const void *buf, size_t count)
         off_t block_offset = offset / block_size_;
         off_t block_start = block_offset * block_size_;
         auto it = cache_.find(block_start);
+        evictPage();
         if (it == cache_.end())
         {
-            evictPage();
             cache_[block_start].fd = fd;
             cache_[block_start].offset = block_start;
             cache_[block_start].data.resize(block_size_);
