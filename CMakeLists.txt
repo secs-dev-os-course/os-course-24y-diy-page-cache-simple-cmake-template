@@ -16,6 +16,10 @@ set(BENCH_SOURCES
     app/bench1.cpp
 )
 
+set(BENCH2_SOURCES
+    app/bench_no_cache.cpp
+)
+
 include_directories(include)
 
 add_library(block_cache SHARED ${LIB_SOURCES})
@@ -26,3 +30,6 @@ target_link_libraries(test PRIVATE block_cache)
 
 add_executable(bench ${BENCH_SOURCES})
 target_link_libraries(bench PRIVATE block_cache)
+
+add_executable(bench_no_cache ${BENCH2_SOURCES})
+target_link_libraries(bench_no_cache)

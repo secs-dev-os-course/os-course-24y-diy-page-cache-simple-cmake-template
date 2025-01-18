@@ -18,8 +18,7 @@ int BlockCache::open(const char *path)
         return -1;
     }
     // remove default cache on MacOS
-    if (fcntl(fd, F_NOCACHE, 1) == -1)
-    {
+    if (fcntl(fd, F_NOCACHE, 1) == -1){
         ::close(fd);
         return -1;
     }
@@ -62,8 +61,8 @@ ssize_t BlockCache::read(int fd, void* buf, size_t count) {
         off_t block_start = block_offset * block_size_;
         off_t block_end = block_start + block_size_;
         auto it = cache_.find(block_start);
-        evictPage();
         if (it == cache_.end()) {
+            evictPage();
             cache_[block_start].offset = block_start;
             cache_[block_start].data.resize(block_size_);
             cache_[block_start].modified = false;
@@ -72,7 +71,6 @@ ssize_t BlockCache::read(int fd, void* buf, size_t count) {
                 std::cerr << "Error reading from file\n";
                 return -1;
             }
-            // no need to update cache if empty
             if (bytes_read == 0){
                 return bytes_read;
             }
@@ -106,14 +104,13 @@ ssize_t BlockCache::write(int fd, const void *buf, size_t count)
         off_t block_offset = offset / block_size_;
         off_t block_start = block_offset * block_size_;
         auto it = cache_.find(block_start);
-        evictPage();
-        if (it == cache_.end())
-        {
+        if (it == cache_.end()){
+            evictPage();
             cache_[block_start].fd = fd;
             cache_[block_start].offset = block_start;
             cache_[block_start].data.resize(block_size_);
             cache_[block_start].modified = false;
-            if (lseek(fd, block_start, SEEK_SET) == -1)
+            if (lseek(fd, block_start) == -1)
             {
                 return -1;
             }
@@ -140,14 +137,14 @@ ssize_t BlockCache::write(int fd, const void *buf, size_t count)
     return 1;
 }
 
-off_t BlockCache::lseek(int fd, off_t offset, int whence)
+off_t BlockCache::lseek(int fd, off_t offset)
 {
     if (file_descriptors_.find(fd) == file_descriptors_.end())
     {
         cerr << "Invalid file descriptor!\n";
         return -1;
     }
-    off_t new_offset = ::lseek(fd, offset, whence);
+    off_t new_offset = ::lseek(fd, offset, SEEK_SET);
     if (new_offset == -1)
     {
         return -1;
@@ -203,7 +200,7 @@ void BlockCache::evictPage()
     CachePage &page = cache_[lru_offset];
     if (page.modified)
     {
-        if (lseek(page.fd, page.offset, SEEK_SET) == -1)
+        if (lseek(page.fd, page.offset) == -1)
         {
             cerr << "Error seeking to offset for write-back\n";
             return;
