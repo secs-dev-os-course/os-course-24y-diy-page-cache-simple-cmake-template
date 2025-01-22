@@ -7,10 +7,33 @@ project(app
 
 cmake_policy(SET CMP0076 NEW) # avoid warning of relative paths translation
 
-add_executable(app)
-target_include_directories(app PRIVATE ${CMAKE_SOURCE_DIR})
+add_executable(app_without_cache
+        ../SecondChanceCache/SecondChanceCache.cpp
+        ../SecondChanceCache/SecondChanceCache.h
+        ../SecondChanceCache/API.cpp
+        ../SecondChanceCache/API.h
+        ema-search-int.h
+        ema-search-int.cpp
+        app_without_cache.cpp)
 
-target_sources(app
+add_executable(app_with_cache
+        ../SecondChanceCache/SecondChanceCache.cpp
+        ../SecondChanceCache/SecondChanceCache.h
+        ../SecondChanceCache/API.cpp
+        ../SecondChanceCache/API.h
+        ema-search-int.h
+        ema-search-int.cpp
+        app_with_cache.cpp)
+
+target_include_directories(app_with_cache PRIVATE ${CMAKE_SOURCE_DIR})
+target_include_directories(app_without_cache PRIVATE ${CMAKE_SOURCE_DIR})
+
+
+target_sources(app_without_cache
         PRIVATE
-        app.c # or app.cpp
+        app_without_cache.cpp)
+
+target_sources(app_with_cache
+        PRIVATE
+        app_with_cache.cpp
 )
