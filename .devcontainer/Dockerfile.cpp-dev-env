@@ -7,5 +7,5 @@ RUN apt install -y --allow-unauthenticated \
     clang-format \
     clangd \
     make \
-    ninja \
+    ninja-build \
     cmake
