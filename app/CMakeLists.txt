@@ -17,13 +17,10 @@ target_sources(lab2
         cache.cpp
 )
 
-# Указываем директории для заголовочных файлов
 target_include_directories(lab2 PUBLIC ${CMAKE_SOURCE_DIR})
 
-# Установка стандартов C++
 set_target_properties(lab2 PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES)
 
-# Установка имени библиотеки и версии (для платформы Windows имя будет lab2.dll)
 set_target_properties(lab2 PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION 1
